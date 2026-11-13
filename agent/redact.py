@@ -867,13 +867,16 @@ def _is_opaque_prefixed_token(token: str) -> bool:
     return False
 
 
-def _mask_prefix_match(m: "re.Match[str]", mask) -> str:
-    glued = m.start() > 0 and m.string[m.start() - 1] in "-_"
+def _is_glued_identifier(m: "re.Match[str]") -> bool:
+    """A _PREFIX_SUB_RE match glued to an identifier by ``-``/``_`` whose body is not opaque."""
     token = m.group(1)
     # Google OAuth prefixes are distinctive even when base64url separators break every long run.
-    if glued and not token.startswith(("GOCSPX-", "ya29.", "1//0")) and not _is_opaque_prefixed_token(token):
-        return m.group(0)
-    return mask(token)
+    return (m.start() > 0 and m.string[m.start() - 1] in "-_"
+            and not token.startswith(("GOCSPX-", "ya29.", "1//0")) and not _is_opaque_prefixed_token(token))
+
+
+def _mask_prefix_match(m: "re.Match[str]", mask) -> str:
+    return m.group(0) if _is_glued_identifier(m) else mask(m.group(1))
 
 # Zhipu API keys use an unprefixed ``id.secret`` form. Keep this deliberately
 # provider-shaped instead of applying a generic high-entropy dotted-token rule:
@@ -901,7 +904,9 @@ def _mask_control_split_tokens(text: str, mask_fn) -> str:
         return text
     orig_idx = [i for i, c in enumerate(text) if not _CONTROL_CHARS_RE.match(c)]
     out, matches = list(text), []
-    for m in _PREFIX_RE.finditer(stripped):
+    for m in _PREFIX_SUB_RE.finditer(stripped):
+        if _is_glued_identifier(m):
+            continue
         start_orig = orig_idx[m.start(1)]
         end_orig = orig_idx[m.end(1) - 1] + 1
         span = text[start_orig:end_orig]

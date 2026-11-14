@@ -493,6 +493,15 @@ DANGEROUS_PATTERNS = [
     # Registry deletion with force flag.
     (r'\breg(?:\.exe)?\s+delete\b', "registry delete (reg delete)"),
     (r'\bremove-itemproperty\b[^\n]*\s' + _PS_FORCE, "registry value delete (Remove-ItemProperty -Force)"),
+    # Registry writes persist past the session (Run keys, HKCU\Environment, policies), so they prompt
+    # like the deletes above; the read verbs (`reg query`/`export`, Get-ItemProperty) stay quiet.
+    # `\s+` after setx keeps a shell assignment (`setx=1`) out.
+    (r'\breg(?:\.exe)?\s+(?:add|import|copy|restore|load|unload)\b', "registry write (reg add/import/copy/restore/load/unload)"),
+    (r'\bregedit(?:\.exe)?\s+[/-]s\b', "registry write (regedit /s silent .reg import)"),
+    # The short aliases are common words, so they only count when aimed at a registry provider path.
+    (r'\b(?:sp|ni|set-item|new-item)\s+(?:-path\s+)?[\'"]?(?:hk(?:cu|lm|cr|u|cc):|registry::)', "registry write (sp/ni/Set-Item/New-Item on a registry path)"),
+    (r'\bsetx(?:\.exe)?\s+[^\s;&|]', "registry write (setx persistent environment variable)"),
+    (r'\b(?:set|new)-itemproperty\b', "registry value write (Set-ItemProperty / New-ItemProperty)"),
     # Windows service/system stop — analogue of systemctl stop.
     (r'\bstop-service\b[^\n]*\s' + _PS_FORCE_ONLY_F, "force stop service (Stop-Service -Force)"),
     (r'\bsc(?:\.exe)?\s+(?:stop|delete)\b', "stop/delete service (sc)"),
